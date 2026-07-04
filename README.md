@@ -127,6 +127,22 @@ click **Export** for a Markdown brief.
 
 ---
 
+## Deploy online for free
+
+Atlas deploys as a **single free web service** (the API serves the built React
+app) backed by a free Postgres database — no AI key required to start.
+
+- **Database:** a free [Neon](https://neon.tech) Postgres (pgvector supported out of the box)
+- **App:** a free [Render](https://render.com) web service — the included
+  [`render.yaml`](./render.yaml) Blueprint wires up build, start, health checks, and env vars
+
+Step-by-step, assume-nothing instructions are in **[DEPLOY.md](./DEPLOY.md)**.
+
+In production the server automatically enables TLS for hosted databases, runs
+migrations on boot (`AUTO_MIGRATE`), and serves the frontend (`SERVE_FRONTEND`).
+
+---
+
 ## Configuration (`backend/.env`)
 
 | Variable                 | Default                                       | Notes                                  |

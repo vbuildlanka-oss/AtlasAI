@@ -1,10 +1,18 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
 import { config, isOffline } from './config.js';
 import { healthcheck } from './db/pool.js';
+import { migrate } from './db/migrate.js';
 import { documentsRouter } from './routes/documents.js';
 import { sessionsRouter } from './routes/sessions.js';
 import { researchRouter } from './routes/research.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// backend/dist/index.js -> repo-root/frontend/dist
+const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 
 const app = express();
 
@@ -27,6 +35,17 @@ app.use('/api/documents', documentsRouter);
 app.use('/api/sessions', sessionsRouter);
 app.use('/api/research', researchRouter);
 
+// In single-service deployments the API also serves the built React app.
+const serveFrontend = config.serveFrontend && existsSync(frontendDist);
+if (serveFrontend) {
+  app.use(express.static(frontendDist));
+  // SPA fallback: any non-API route returns index.html so client routing works.
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
+
 // Central error handler.
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[error]', err);
@@ -34,8 +53,22 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: message });
 });
 
-app.listen(config.port, () => {
-  console.log(`\n🛰  Atlas Intelligence API listening on http://localhost:${config.port}`);
-  console.log(`   Mode: ${isOffline ? 'OFFLINE MOCK (no OpenAI key)' : 'OpenAI (' + config.openai.chatModel + ')'}`);
-  console.log(`   DB:   ${config.databaseUrl.replace(/:[^:@/]+@/, ':****@')}\n`);
-});
+async function start() {
+  // On a fresh deploy, self-initialize the schema (idempotent — all IF NOT EXISTS).
+  if (config.autoMigrate) {
+    try {
+      await migrate();
+    } catch (err) {
+      console.error('[startup] auto-migration failed (continuing):', err instanceof Error ? err.message : err);
+    }
+  }
+
+  app.listen(config.port, () => {
+    console.log(`\n🛰  Atlas Intelligence listening on port ${config.port}`);
+    console.log(`   Mode:     ${isOffline ? 'OFFLINE MOCK (no OpenAI key)' : 'OpenAI (' + config.openai.chatModel + ')'}`);
+    console.log(`   Frontend: ${serveFrontend ? 'served from this service' : 'run separately (vite dev)'}`);
+    console.log(`   DB:       ${config.databaseUrl.replace(/:[^:@/]+@/, ':****@')} (ssl: ${config.databaseSsl})\n`);
+  });
+}
+
+start();

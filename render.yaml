@@ -1,0 +1,31 @@
+# Render Blueprint — deploys Atlas Intelligence as a single free web service.
+# The service builds the React frontend, builds the Node API, and serves both
+# together. Bring your own Postgres (with pgvector) — e.g. a free Neon database —
+# and paste its connection string into the DATABASE_URL env var during setup.
+#
+# One-click: push this repo to GitHub, then in Render choose
+# "New +" -> "Blueprint" and point it at the repo. See DEPLOY.md.
+services:
+  - type: web
+    name: atlas-intelligence
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # Deploy behaviour
+      - key: SERVE_FRONTEND
+        value: "true"
+      - key: AUTO_MIGRATE
+        value: "true"
+      # Your Postgres connection string (from Neon). Set in the Render dashboard.
+      - key: DATABASE_URL
+        sync: false
+      # Optional: leave unset to run in free offline-mock mode; add a key for GPT-4-class answers.
+      - key: OPENAI_API_KEY
+        sync: false

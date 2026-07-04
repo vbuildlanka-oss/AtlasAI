@@ -3,7 +3,12 @@ import { config } from '../config.js';
 
 const { Pool } = pg;
 
-export const pool = new Pool({ connectionString: config.databaseUrl });
+export const pool = new Pool({
+  connectionString: config.databaseUrl,
+  // Managed Postgres providers (Neon/Render/Supabase) require TLS. Their certs
+  // are valid, but rejectUnauthorized:false avoids chain issues on free tiers.
+  ssl: config.databaseSsl ? { rejectUnauthorized: false } : undefined,
+});
 
 pool.on('error', (err) => {
   // A backend that keeps running even if an idle client errors out.

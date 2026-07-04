@@ -1,0 +1,14 @@
+{
+  "name": "atlas-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atlas Intelligence — multi-agent, citation-grounded AI research workspace",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm --prefix frontend install --include=dev && npm --prefix frontend run build && npm --prefix backend install --include=dev && npm --prefix backend run build",
+    "start": "npm --prefix backend run start",
+    "migrate": "npm --prefix backend run migrate"
+  }
+}
