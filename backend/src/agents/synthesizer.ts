@@ -73,11 +73,17 @@ async function llmSynthesize(question: string, evidence: RetrievedChunk[]): Prom
  */
 function mockSynthesize(question: string, evidence: RetrievedChunk[]): string {
   const top = evidence.slice(0, 5);
+  const seen = new Set<string>();
   const claims = top
     .map((chunk, i) => {
-      const sentence = leadingSentence(chunk.content);
+      // Pick the sentence that best answers the question, not just the first one.
+      const sentence = bestSentence(chunk.content, question);
+      const key = sentence.toLowerCase();
+      if (seen.has(key)) return null;
+      seen.add(key);
       return `${sentence} [${i + 1}]`;
     })
+    .filter((c): c is string => c !== null)
     .join(' ');
 
   const intro = `Drawing on ${top.length} source${top.length > 1 ? 's' : ''} relevant to "${question.trim()}", the evidence indicates the following.`;
@@ -88,13 +94,77 @@ function mockSynthesize(question: string, evidence: RetrievedChunk[]): string {
   return `${intro} ${claims} ${outro}`;
 }
 
-/** Take a clean, self-contained opening sentence (or clause) from a chunk. */
-function leadingSentence(content: string): string {
-  const trimmed = content.trim().replace(/\s+/g, ' ');
-  const match = trimmed.match(/^(.{40,240}?[.!?])(\s|$)/);
-  let sentence = match ? match[1] : trimmed.slice(0, 200);
-  if (!/[.!?]$/.test(sentence)) sentence = sentence.replace(/[,;:]?\s*$/, '') + '.';
-  return sentence;
+const STOPWORDS = new Set([
+  'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'of', 'to', 'in', 'on',
+  'for', 'and', 'or', 'how', 'what', 'which', 'does', 'do', 'did', 'much', 'many',
+  'it', 'its', 'this', 'that', 'with', 'as', 'at', 'by', 'from', 'about', 'can', 'per',
+]);
+
+/** Lowercase, drop punctuation/stopwords, and lightly stem trailing plural 's'. */
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 1 && !STOPWORDS.has(t))
+    .map((t) => (t.length > 3 && t.endsWith('s') ? t.slice(0, -1) : t));
+}
+
+function splitSentences(content: string): string[] {
+  return content
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9"'(])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Questions that are really asking for a figure (a quantity, price, date, …).
+const QUANTITATIVE_RE =
+  /\b(how much|how many|how fast|how long|how far|how old|how big|how heavy|when|what year|rate|cost|costs|price|priced|percent|percentage|number of|amount|speed|capacity|weight|size|duration)\b/i;
+
+/** Numeric tokens in a piece of text (e.g. "500", "1", "200"). */
+function numbersIn(text: string): string[] {
+  return (text.toLowerCase().match(/\d+/g) ?? []);
+}
+
+/**
+ * Choose the sentence in a chunk that best answers the question (offline mode).
+ *
+ * Scoring = keyword overlap, plus — for quantitative questions ("how much",
+ * "cost", "when", …) — a strong bonus for sentences that introduce a NEW number
+ * not already in the question. That way "how much water does it pump?" surfaces
+ * "It can pump 500 liters per hour" instead of the definition sentence, even
+ * though the definition shares more words. Falls back to the leading sentence.
+ */
+function bestSentence(content: string, question: string): string {
+  const sentences = splitSentences(content);
+  if (sentences.length === 0) return finalize(content.slice(0, 200));
+
+  const qWords = new Set(tokenize(question));
+  const qNumbers = new Set(numbersIn(question));
+  const wantsNumber = QUANTITATIVE_RE.test(question);
+
+  let best = sentences[0];
+  let bestScore = -Infinity;
+  for (const s of sentences) {
+    const overlap = tokenize(s).reduce((acc, w) => acc + (qWords.has(w) ? 1 : 0), 0);
+    const hasNewNumber = numbersIn(s).some((n) => !qNumbers.has(n));
+    const numberBonus = wantsNumber && hasNewNumber ? 4 : 0;
+    const score = overlap + numberBonus;
+    if (score > bestScore) {
+      bestScore = score;
+      best = s;
+    }
+  }
+  return finalize(best);
+}
+
+/** Clean a sentence into a self-contained, punctuated claim. */
+function finalize(sentence: string): string {
+  let s = sentence.trim().replace(/\s+/g, ' ').slice(0, 240);
+  if (!/[.!?]$/.test(s)) s = s.replace(/[,;:]?\s*$/, '') + '.';
+  return s;
 }
 
 /**

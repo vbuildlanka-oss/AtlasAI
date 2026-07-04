@@ -6,11 +6,12 @@
 -- vector(1536) columns below and re-run migrations.
 
 CREATE EXTENSION IF NOT EXISTS vector;
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Note: UUID defaults use the built-in gen_random_uuid() (Postgres 13+ core),
+-- so no uuid-ossp extension is required — one less thing to fail on a host.
 
 -- Source documents ingested into the workspace ----------------------------
 CREATE TABLE IF NOT EXISTS documents (
-    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title        TEXT NOT NULL,
     source_url   TEXT,
     source_type  TEXT NOT NULL DEFAULT 'text', -- text | pdf | url
@@ -20,7 +21,7 @@ CREATE TABLE IF NOT EXISTS documents (
 
 -- Chunked + embedded slices of each document ------------------------------
 CREATE TABLE IF NOT EXISTS chunks (
-    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id  UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     content      TEXT NOT NULL,
     embedding    vector(1536),
@@ -46,7 +47,7 @@ CREATE INDEX IF NOT EXISTS chunks_document_id_idx ON chunks(document_id);
 
 -- Research sessions (one per question asked) ------------------------------
 CREATE TABLE IF NOT EXISTS sessions (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     TEXT NOT NULL DEFAULT 'anonymous',
     question    TEXT NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -54,7 +55,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 -- Synthesized answers produced for a session ------------------------------
 CREATE TABLE IF NOT EXISTS answers (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id  UUID NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     content     TEXT NOT NULL,
     plan        JSONB NOT NULL DEFAULT '[]'::jsonb, -- sub-queries the planner produced
@@ -63,7 +64,7 @@ CREATE TABLE IF NOT EXISTS answers (
 
 -- Citations linking answer spans back to the exact source chunk -----------
 CREATE TABLE IF NOT EXISTS citations (
-    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     answer_id    UUID NOT NULL REFERENCES answers(id) ON DELETE CASCADE,
     chunk_id     UUID NOT NULL REFERENCES chunks(id) ON DELETE CASCADE,
     marker       INTEGER NOT NULL,           -- the [n] number shown inline
