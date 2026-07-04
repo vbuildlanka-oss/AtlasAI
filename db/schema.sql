@@ -29,11 +29,18 @@ CREATE TABLE IF NOT EXISTS chunks (
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Approximate-nearest-neighbour index for fast semantic search.
--- Cosine distance matches the normalized embeddings the backend stores.
-CREATE INDEX IF NOT EXISTS chunks_embedding_idx
-    ON chunks USING ivfflat (embedding vector_cosine_ops)
-    WITH (lists = 100);
+-- Semantic-search index for the embeddings.
+--
+-- IMPORTANT: do NOT use an IVFFlat index here. IVFFlat is an *approximate*
+-- index whose clusters are trained at CREATE time. Because migrations run
+-- before any rows exist, an IVFFlat index gets built on an empty table and
+-- then silently returns ZERO rows at query time (its single probed cluster is
+-- untrained/empty) — even though the data is present. HNSW has no such training
+-- step and returns correct results on a fresh table, so we use it instead.
+-- The DROP removes any legacy IVFFlat index from databases created earlier.
+DROP INDEX IF EXISTS chunks_embedding_idx;
+CREATE INDEX IF NOT EXISTS chunks_embedding_hnsw_idx
+    ON chunks USING hnsw (embedding vector_cosine_ops);
 
 CREATE INDEX IF NOT EXISTS chunks_document_id_idx ON chunks(document_id);
 
