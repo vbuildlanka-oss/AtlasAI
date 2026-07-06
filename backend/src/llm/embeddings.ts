@@ -1,5 +1,5 @@
-import { config, isOffline } from '../config.js';
-import { getOpenAI } from './openai.js';
+import { config } from '../config.js';
+import { getEmbeddingClient } from './client.js';
 
 /**
  * Deterministic, network-free embedding used in OFFLINE MOCK mode.
@@ -45,17 +45,17 @@ function hash(str: string): number {
   return h >>> 0;
 }
 
-/** Embed a batch of texts. Uses OpenAI when configured, otherwise the mock. */
+/** Embed a batch of texts. Uses the configured embedding provider, else the mock. */
 export async function embed(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
 
-  if (isOffline) {
+  if (!config.llm.embeddings.enabled) {
     return texts.map(mockEmbed);
   }
 
-  const client = getOpenAI();
+  const client = getEmbeddingClient();
   const res = await client.embeddings.create({
-    model: config.openai.embeddingModel,
+    model: config.llm.embeddings.model,
     input: texts,
   });
   // OpenAI preserves input order in res.data.

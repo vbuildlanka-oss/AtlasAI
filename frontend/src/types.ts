@@ -47,9 +47,8 @@ export interface DocumentSummary {
 export interface HealthInfo {
   status: string;
   db: string;
-  mode: 'offline-mock' | 'openai';
-  chatModel: string | null;
-  embeddingModel: string;
+  chat: { provider: 'openai' | 'groq' | 'mock'; model: string | null };
+  embeddings: { provider: 'openai' | 'groq' | 'mock'; model: string };
 }
 
 // --- Canvas ---------------------------------------------------------------

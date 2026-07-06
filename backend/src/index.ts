@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
-import { config, isOffline } from './config.js';
+import { config } from './config.js';
 import { healthcheck } from './db/pool.js';
 import { migrate } from './db/migrate.js';
 import { documentsRouter } from './routes/documents.js';
@@ -19,15 +19,20 @@ const app = express();
 app.use(cors({ origin: config.corsOrigins.length ? config.corsOrigins : true }));
 app.use(express.json({ limit: '5mb' }));
 
-// Health / status — also reports whether we're in offline mock mode.
+// Health / status — reports the active chat + embedding providers.
 app.get('/api/health', async (_req, res) => {
   const db = await healthcheck();
   res.json({
     status: 'ok',
     db: db ? 'connected' : 'unavailable',
-    mode: isOffline ? 'offline-mock' : 'openai',
-    chatModel: isOffline ? null : config.openai.chatModel,
-    embeddingModel: isOffline ? 'mock-hashing' : config.openai.embeddingModel,
+    chat: {
+      provider: config.llm.chat.provider,
+      model: config.llm.chat.enabled ? config.llm.chat.model : null,
+    },
+    embeddings: {
+      provider: config.llm.embeddings.provider,
+      model: config.llm.embeddings.model,
+    },
   });
 });
 
@@ -63,11 +68,19 @@ async function start() {
     }
   }
 
+  const chatDesc = config.llm.chat.enabled
+    ? `${config.llm.chat.provider} (${config.llm.chat.model})`
+    : 'offline mock template';
+  const embDesc = config.llm.embeddings.enabled
+    ? `${config.llm.embeddings.provider} (${config.llm.embeddings.model})`
+    : 'offline mock (local hashing)';
+
   app.listen(config.port, () => {
     console.log(`\n🛰  Atlas Intelligence listening on port ${config.port}`);
-    console.log(`   Mode:     ${isOffline ? 'OFFLINE MOCK (no OpenAI key)' : 'OpenAI (' + config.openai.chatModel + ')'}`);
-    console.log(`   Frontend: ${serveFrontend ? 'served from this service' : 'run separately (vite dev)'}`);
-    console.log(`   DB:       ${config.databaseUrl.replace(/:[^:@/]+@/, ':****@')} (ssl: ${config.databaseSsl})\n`);
+    console.log(`   Chat:       ${chatDesc}`);
+    console.log(`   Embeddings: ${embDesc}`);
+    console.log(`   Frontend:   ${serveFrontend ? 'served from this service' : 'run separately (vite dev)'}`);
+    console.log(`   DB:         ${config.databaseUrl.replace(/:[^:@/]+@/, ':****@')} (ssl: ${config.databaseSsl})\n`);
   });
 }
 

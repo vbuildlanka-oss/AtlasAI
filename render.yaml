@@ -26,6 +26,10 @@ services:
       # Your Postgres connection string (from Neon). Set in the Render dashboard.
       - key: DATABASE_URL
         sync: false
-      # Optional: leave unset to run in free offline-mock mode; add a key for GPT-4-class answers.
+      # AI providers (all optional). Leave unset to run in free offline-mock mode.
+      # GROQ_API_KEY  -> free real-AI answers (no card); search stays local.
+      # OPENAI_API_KEY -> upgrades both search + answers (paid).
+      - key: GROQ_API_KEY
+        sync: false
       - key: OPENAI_API_KEY
         sync: false

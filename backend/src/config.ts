@@ -39,10 +39,9 @@ export const config = {
   /** Serve the built frontend from the API (single-service deploys). Auto-on in production. */
   serveFrontend: bool('SERVE_FRONTEND', isProduction),
 
-  openai: {
-    apiKey: process.env.OPENAI_API_KEY?.trim() ?? '',
-    chatModel: process.env.OPENAI_CHAT_MODEL ?? 'gpt-4o',
-    embeddingModel: process.env.OPENAI_EMBEDDING_MODEL ?? 'text-embedding-3-small',
+  llm: {
+    chat: resolveChatProvider(),
+    embeddings: resolveEmbeddingProvider(),
   },
 
   embeddingDim: num('EMBEDDING_DIM', 1536),
@@ -54,5 +53,69 @@ export const config = {
   },
 };
 
-/** True when no OpenAI key is configured — the whole app runs offline/deterministic. */
-export const isOffline = config.openai.apiKey === '';
+// --- LLM provider resolution ---------------------------------------------
+//
+// Chat (planning + synthesis) and embeddings (RAG search) are resolved
+// independently, so you can mix providers — e.g. free Groq for the written
+// answer while keeping the free local embedder for search.
+//
+//   Chat priority:       GROQ_API_KEY  ->  OPENAI_API_KEY  ->  mock template
+//   Embeddings priority: OPENAI_API_KEY (Groq has no embeddings API) -> mock
+//
+// Any OpenAI-compatible endpoint works via *_BASE_URL (that's how Groq plugs in).
+
+export type LlmProvider = 'openai' | 'groq' | 'mock';
+
+export interface ProviderConfig {
+  /** false => use the deterministic offline mock for this capability. */
+  enabled: boolean;
+  provider: LlmProvider;
+  apiKey: string;
+  /** OpenAI-compatible base URL; undefined uses the OpenAI default. */
+  baseUrl: string | undefined;
+  model: string;
+}
+
+function resolveChatProvider(): ProviderConfig {
+  const groqKey = process.env.GROQ_API_KEY?.trim() ?? '';
+  const openaiKey = process.env.OPENAI_API_KEY?.trim() ?? '';
+
+  if (groqKey) {
+    return {
+      enabled: true,
+      provider: 'groq',
+      apiKey: groqKey,
+      baseUrl: process.env.GROQ_BASE_URL?.trim() || 'https://api.groq.com/openai/v1',
+      model: process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile',
+    };
+  }
+  if (openaiKey) {
+    return {
+      enabled: true,
+      provider: 'openai',
+      apiKey: openaiKey,
+      baseUrl: process.env.OPENAI_BASE_URL?.trim() || undefined,
+      model: process.env.OPENAI_CHAT_MODEL?.trim() || 'gpt-4o',
+    };
+  }
+  return { enabled: false, provider: 'mock', apiKey: '', baseUrl: undefined, model: 'mock-template' };
+}
+
+function resolveEmbeddingProvider(): ProviderConfig {
+  const openaiKey = process.env.OPENAI_API_KEY?.trim() ?? '';
+  if (openaiKey) {
+    return {
+      enabled: true,
+      provider: 'openai',
+      apiKey: openaiKey,
+      baseUrl: process.env.OPENAI_BASE_URL?.trim() || undefined,
+      model: process.env.OPENAI_EMBEDDING_MODEL?.trim() || 'text-embedding-3-small',
+    };
+  }
+  // Groq has no embeddings endpoint, so a Groq-only setup uses the local mock
+  // embedder for search — which is free and needs no vector-dimension changes.
+  return { enabled: false, provider: 'mock', apiKey: '', baseUrl: undefined, model: 'mock-hashing' };
+}
+
+/** True only when BOTH chat and embeddings run on the offline mock. */
+export const isFullyOffline = !config.llm.chat.enabled && !config.llm.embeddings.enabled;

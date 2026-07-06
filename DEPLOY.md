@@ -51,9 +51,14 @@ question at the bottom, and you'll get a cited answer. Share the link with anyon
 ### Two things to know
 - **First load is slow.** Free apps "go to sleep" when idle. The first visit after
   a quiet spell takes ~30–60 seconds to wake up, then it's fast. This is normal.
-- **Want real GPT-4-class answers?** In Render, open your service → **Environment**
-  → add `OPENAI_API_KEY` with your OpenAI key → save. It redeploys and switches
-  from mock mode to real AI automatically. (This part costs money on OpenAI's side.)
+- **Want real AI answers, for free?** Use **Groq** (no credit card):
+  1. Go to **https://console.groq.com/keys**, sign in, and click **Create API Key**. Copy it.
+  2. In Render: your service → **Environment** → add a variable named `GROQ_API_KEY`
+     and paste the key → **Save**.
+  3. It redeploys itself. Ask a question and you'll now get genuine, written AI
+     answers instead of quoted sentences. Search still uses the free local method.
+  - Prefer OpenAI (also upgrades search quality)? Add `OPENAI_API_KEY` instead.
+    That one costs money on OpenAI's side.
 
 ---
 
@@ -73,5 +78,6 @@ You can skip `render.yaml` and set it up by hand:
 2. **Build Command:** `npm run build`
 3. **Start Command:** `npm run start`
 4. **Environment variables:** `NODE_ENV=production`, `SERVE_FRONTEND=true`,
-   `AUTO_MIGRATE=true`, `DATABASE_URL=<your Neon string>`, and optionally `OPENAI_API_KEY`.
+   `AUTO_MIGRATE=true`, `DATABASE_URL=<your Neon string>`, and optionally
+   `GROQ_API_KEY` (free real-AI answers) or `OPENAI_API_KEY`.
 5. Choose the **Free** plan and create.

@@ -1,5 +1,5 @@
-import { isOffline } from '../config.js';
-import { chat } from '../llm/openai.js';
+import { config } from '../config.js';
+import { chat } from '../llm/client.js';
 
 /**
  * Planner agent — decomposes a research question into focused sub-queries.
@@ -9,7 +9,7 @@ import { chat } from '../llm/openai.js';
  * question from multiple angles.
  */
 export async function planResearch(question: string): Promise<string[]> {
-  if (isOffline) {
+  if (!config.llm.chat.enabled) {
     return mockPlan(question);
   }
 
@@ -19,15 +19,15 @@ export async function planResearch(question: string): Promise<string[]> {
     'cover it. Each sub-query should be self-contained and optimized for semantic ' +
     'document retrieval. Respond ONLY as JSON: {"subQueries": string[]}.';
 
-  const raw = await chat(
-    [
-      { role: 'system', content: system },
-      { role: 'user', content: question },
-    ],
-    { json: true, temperature: 0.3 },
-  );
-
   try {
+    const raw = await chat(
+      [
+        { role: 'system', content: system },
+        { role: 'user', content: question },
+      ],
+      { json: true, temperature: 0.3 },
+    );
+
     const parsed = JSON.parse(raw) as { subQueries?: unknown };
     if (Array.isArray(parsed.subQueries)) {
       const cleaned = parsed.subQueries
@@ -36,8 +36,11 @@ export async function planResearch(question: string): Promise<string[]> {
         .slice(0, 6);
       if (cleaned.length > 0) return cleaned;
     }
-  } catch {
-    // fall through to a safe default
+  } catch (err) {
+    // Planning is non-critical: if the provider errors or returns bad JSON,
+    // degrade to the deterministic plan rather than failing the whole request.
+    console.warn('[planner] falling back to mock plan:', err instanceof Error ? err.message : err);
+    return mockPlan(question);
   }
   return [question];
 }

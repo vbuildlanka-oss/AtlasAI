@@ -150,7 +150,9 @@ migrations on boot (`AUTO_MIGRATE`), and serves the frontend (`SERVE_FRONTEND`).
 | `PORT`                   | `4000`                                        | API port                               |
 | `CORS_ORIGIN`            | `http://localhost:5173`                       | comma-separated allowed origins        |
 | `DATABASE_URL`           | `postgres://atlas:atlas@localhost:5432/atlas` | Postgres connection string             |
-| `OPENAI_API_KEY`         | *(empty)*                                     | empty → offline mock mode              |
+| `GROQ_API_KEY`           | *(empty)*                                     | free real-AI **answers** (chat); search stays on the local embedder |
+| `GROQ_MODEL`             | `llama-3.3-70b-versatile`                      | Groq chat model                        |
+| `OPENAI_API_KEY`         | *(empty)*                                     | upgrades **both** search + answers (paid) |
 | `OPENAI_CHAT_MODEL`      | `gpt-4o`                                       | synthesis / planning model             |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small`                      | embedding model                        |
 | `EMBEDDING_DIM`          | `1536`                                        | **must** match `vector(N)` in schema   |
@@ -160,13 +162,21 @@ migrations on boot (`AUTO_MIGRATE`), and serves the frontend (`SERVE_FRONTEND`).
 > Changing `EMBEDDING_DIM` requires updating the `vector(1536)` columns in
 > `db/schema.sql` and re-running the migration.
 
+**AI providers** are resolved independently so you can mix them:
+- **Chat** (planning + written answers): `GROQ_API_KEY` → `OPENAI_API_KEY` → offline mock.
+- **Embeddings** (search): `OPENAI_API_KEY` → offline mock (Groq has no embeddings API).
+
+So the free, no-card path is **`GROQ_API_KEY` alone**: real AI-written answers with
+the free local search — no schema change and no re-ingesting needed. Any
+OpenAI-compatible endpoint also works via `GROQ_BASE_URL` / `OPENAI_BASE_URL`.
+
 ---
 
 ## API
 
 | Method | Path                             | Description                                   |
 | ------ | -------------------------------- | --------------------------------------------- |
-| GET    | `/api/health`                    | status + current mode (offline-mock / openai) |
+| GET    | `/api/health`                    | status + active chat/embedding providers      |
 | GET    | `/api/documents`                 | list ingested documents (+ chunk counts)      |
 | POST   | `/api/documents/text`            | ingest raw text `{ text, title? }`            |
 | POST   | `/api/documents/url`             | ingest a URL `{ url }`                         |

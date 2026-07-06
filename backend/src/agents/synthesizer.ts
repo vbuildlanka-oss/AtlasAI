@@ -1,5 +1,5 @@
-import { isOffline } from '../config.js';
-import { chat } from '../llm/openai.js';
+import { config } from '../config.js';
+import { chat } from '../llm/client.js';
 import type { Citation, RetrievedChunk } from '../types.js';
 
 export interface SynthesisOutput {
@@ -27,9 +27,9 @@ export async function synthesize(
     return { answer: NO_EVIDENCE_MESSAGE, citations: [] };
   }
 
-  const answer = isOffline
-    ? mockSynthesize(question, evidence)
-    : await llmSynthesize(question, evidence);
+  const answer = config.llm.chat.enabled
+    ? await llmSynthesize(question, evidence)
+    : mockSynthesize(question, evidence);
 
   const citations = buildCitations(answer, evidence);
   return { answer, citations };

@@ -1,5 +1,5 @@
 import { pool } from '../db/pool.js';
-import { isOffline } from '../config.js';
+import { config } from '../config.js';
 import { planResearch } from './planner.js';
 import { consolidateEvidence, retrieveForPlan } from './retriever.js';
 import { synthesize } from './synthesizer.js';
@@ -23,7 +23,7 @@ export async function runResearch(
 ): Promise<ResearchResult> {
   const emit = opts.emit ?? noop;
   const userId = opts.userId ?? 'anonymous';
-  const mode = isOffline ? 'offline mock' : 'OpenAI';
+  const mode = config.llm.chat.enabled ? config.llm.chat.provider : 'offline mock';
 
   try {
     // 1. Plan -------------------------------------------------------------

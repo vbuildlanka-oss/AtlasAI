@@ -19,6 +19,12 @@ function uid(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+const PROVIDER_LABEL: Record<string, string> = {
+  openai: 'OpenAI',
+  groq: 'Groq',
+  mock: 'Offline mock',
+};
+
 export default function App() {
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
@@ -142,8 +148,13 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           {health && (
-            <span className={`mode-badge ${health.mode}`}>
-              {health.mode === 'offline-mock' ? 'Offline mock' : `OpenAI · ${health.chatModel}`}
+            <span
+              className={`mode-badge ${health.chat.provider === 'mock' ? 'offline-mock' : 'openai'}`}
+              title={`Chat: ${health.chat.provider} · Search: ${health.embeddings.provider} · DB: ${health.db}`}
+            >
+              {health.chat.provider === 'mock'
+                ? 'Offline mock'
+                : `${PROVIDER_LABEL[health.chat.provider]} · ${health.chat.model}`}
               <span className={`db-dot ${health.db === 'connected' ? 'ok' : 'down'}`} title={`DB: ${health.db}`} />
             </span>
           )}
