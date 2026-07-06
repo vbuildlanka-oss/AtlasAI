@@ -1,32 +1,19 @@
-# Dependencies
-node_modules/
-**/node_modules/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
 
-# Build output
-dist/
-build/
-**/dist/
-**/build/
+# Virtual environments
+.venv/
+venv/
+env/
 
-# Env / secrets
-.env
-**/.env
-!**/.env.example
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Editor / OS
+# OS / editor
 .DS_Store
 .idea/
 .vscode/
-*.swp
 
-# Postgres volume (if bind-mounted locally)
-pgdata/
-
-# Uploads
-backend/uploads/
+# Streamlit local secrets (not used by this project, but ignored just in case)
+.streamlit/secrets.toml
