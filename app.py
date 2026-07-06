@@ -1,46 +1,52 @@
-"""Digit Vision — an interactive handwritten-digit recognition studio.
+"""Churn Radar — a customer-churn prediction & insights studio.
 
-A fully self-contained machine-learning web app:
-  * trains classic scikit-learn classifiers on the built-in digits dataset,
-  * compares their accuracy, and
-  * lets you watch a model classify individual digits in real time.
+An end-to-end machine-learning app for a real business problem: predict which
+telecom customers are about to leave, understand *why*, and score new customers
+interactively.
 
-No API keys, no database, no external services — it runs entirely offline.
-Run locally with:  streamlit run app.py
+Fully self-contained — the dataset is bundled and models train locally. No API
+keys, no database, no external services. Run locally with:  streamlit run app.py
 """
 from __future__ import annotations
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import streamlit as st
 
-from src.data import load_dataset
-from src.model import (
-    DEFAULT_MODEL,
-    MODEL_BUILDERS,
-    misclassified_indices,
-    predict_one,
+from src.data import CATEGORICAL_FEATURES, NUMERIC_FEATURES, feature_metadata, load_data
+from src.evaluate import (
+    compare_models,
+    evaluate_model,
+    feature_importances,
+    predict_customer,
     train_model,
 )
+from src.pipeline import DEFAULT_MODEL, MODELS
 
-# --------------------------------------------------------------------------- #
-# Page setup
-# --------------------------------------------------------------------------- #
 st.set_page_config(
-    page_title="Digit Vision — ML Studio",
-    page_icon="✏️",
+    page_title="Churn Radar — ML Studio",
+    page_icon="📡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
+PRIMARY = "#5b8cff"
+CHURN_C = "#ff6b6b"
+STAY_C = "#3fce8f"
+
 
 # --------------------------------------------------------------------------- #
-# Cached compute (runs once, then reused across interactions)
+# Cached compute
 # --------------------------------------------------------------------------- #
 @st.cache_data(show_spinner=False)
 def get_data():
-    return load_dataset()
+    return load_data()
+
+
+@st.cache_data(show_spinner=False)
+def get_comparison():
+    return compare_models(get_data())
 
 
 @st.cache_resource(show_spinner=False)
@@ -48,265 +54,285 @@ def get_model(name: str):
     return train_model(name, get_data())
 
 
-def digit_figure(image: np.ndarray, size: float = 2.2):
-    """Render a single 8x8 digit image."""
-    fig, ax = plt.subplots(figsize=(size, size))
-    ax.imshow(image, cmap="gray_r", interpolation="nearest")
-    ax.set_xticks([])
-    ax.set_yticks([])
-    fig.tight_layout(pad=0)
-    return fig
+@st.cache_data(show_spinner=False)
+def get_importances(name: str):
+    return feature_importances(get_model(name), get_data())
 
 
-def confusion_figure(matrix: np.ndarray, labels: list[str]):
-    fig, ax = plt.subplots(figsize=(6, 5))
-    im = ax.imshow(matrix, cmap="Blues")
-    ax.set_xticks(range(len(labels)), labels)
-    ax.set_yticks(range(len(labels)), labels)
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("Actual")
-    # Annotate each cell.
-    thresh = matrix.max() / 2.0
-    for i in range(matrix.shape[0]):
-        for j in range(matrix.shape[1]):
-            ax.text(
-                j,
-                i,
-                int(matrix[i, j]),
-                ha="center",
-                va="center",
-                color="white" if matrix[i, j] > thresh else "black",
-                fontsize=8,
-            )
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    fig.tight_layout()
-    return fig
+data = get_data()
+meta = feature_metadata(data.X)
 
 
 # --------------------------------------------------------------------------- #
 # Sidebar
 # --------------------------------------------------------------------------- #
-data = get_data()
-
 with st.sidebar:
-    st.title("✏️ Digit Vision")
-    st.caption("Handwritten-digit recognition, powered by scikit-learn.")
+    st.title("📡 Churn Radar")
+    st.caption("Predict and explain customer churn.")
     model_name = st.selectbox(
-        "Choose a model",
-        list(MODEL_BUILDERS.keys()),
-        index=list(MODEL_BUILDERS.keys()).index(DEFAULT_MODEL),
-        help="Each model is trained live on the digits dataset.",
+        "Model",
+        list(MODELS.keys()),
+        index=list(MODELS.keys()).index(DEFAULT_MODEL),
+        key="model_select",
+    )
+    threshold = st.slider(
+        "Decision threshold",
+        0.05,
+        0.95,
+        0.50,
+        0.01,
+        key="threshold",
+        help="A customer is flagged as 'will churn' when their predicted "
+        "probability is above this value. Lower it to catch more churners "
+        "(higher recall); raise it to reduce false alarms (higher precision).",
     )
     st.divider()
     st.markdown(
-        "**100% self-contained**\n\n"
-        "No API keys, no database, no internet needed — the model trains "
-        "right here on a dataset that ships with scikit-learn."
+        "**100% self-contained**\n\nBundled dataset, models trained locally. "
+        "No API keys, no database — nothing external to fail."
     )
 
 with st.spinner(f"Training {model_name}…"):
     model = get_model(model_name)
+ev = evaluate_model(model, data, threshold=threshold)
 
 
 # --------------------------------------------------------------------------- #
 # Header
 # --------------------------------------------------------------------------- #
-st.title("✏️ Digit Vision")
-st.markdown(
-    "#### Teaching a computer to read handwritten numbers — and showing its work."
-)
+st.title("📡 Churn Radar")
+st.markdown("#### Predicting which customers will leave — and showing why.")
 
-tab_overview, tab_data, tab_perf, tab_try = st.tabs(
-    ["🏠 Overview", "📊 Explore the Data", "🤖 Model & Performance", "🔮 Try It Live"]
+tab_home, tab_eda, tab_models, tab_explain, tab_predict = st.tabs(
+    ["🏠 Overview", "📊 Data & Insights", "🤖 Models & Evaluation", "🔍 What Drives Churn", "🔮 Predict a Customer"]
 )
 
 
 # --------------------------------------------------------------------------- #
 # Overview
 # --------------------------------------------------------------------------- #
-with tab_overview:
+with tab_home:
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Images", f"{data.n_samples:,}")
-    c2.metric("Pixels / image", data.n_features)
-    c3.metric("Digit classes", data.n_classes)
-    c4.metric(f"{model_name} accuracy", f"{model.accuracy:.1%}")
+    c1.metric("Customers", f"{data.n_rows:,}")
+    c2.metric("Churn rate", f"{data.churn_rate:.1%}")
+    c3.metric("Features", len(NUMERIC_FEATURES) + len(CATEGORICAL_FEATURES))
+    c4.metric(f"{model_name} ROC-AUC", f"{ev.roc_auc:.3f}")
 
     st.markdown(
         """
-### What is this?
-**Digit Vision** trains a machine-learning model to recognise handwritten
-digits (0–9) from tiny 8×8 pixel images, then lets you explore how well it
-works and watch it make predictions one digit at a time.
+### The business problem
+Keeping an existing customer is far cheaper than winning a new one. **Churn
+Radar** learns the patterns behind customers who leave, so a retention team can
+step in *before* they go — and understand which levers matter most.
 
-### How it works
-1. **Data** — 1,797 labelled digit images that ship with scikit-learn.
-2. **Train** — a classifier learns the pixel patterns that distinguish each digit.
-3. **Evaluate** — we measure accuracy on images the model has never seen.
-4. **Predict** — feed it a new digit and it tells you what it sees, with its confidence.
-
-### Why it's reliable
-- **No API keys and no database.** The dataset is bundled with the library, so
-  there is nothing to configure and nothing external that can fail.
-- **Reproducible.** A fixed random seed means the same results every run.
+### What this project demonstrates
+- **A real, messy dataset** — cleaned and prepared with a reproducible pipeline.
+- **A proper scikit-learn `Pipeline`** — imputation, scaling, and one-hot
+  encoding are bundled with the model, so training and prediction are identical.
+- **Honest evaluation for imbalanced data** — models are compared with
+  cross-validated **ROC-AUC**, and reported with precision/recall, not just
+  accuracy (which is misleading when only ~1 in 4 customers churn).
+- **An adjustable decision threshold** — trade off catching more churners
+  (recall) against fewer false alarms (precision), a real business decision.
+- **Explainability** — permutation importance reveals what actually drives the
+  predictions.
+- **A live predictor** — score any customer profile in real time.
 
 ### Tech stack
-`Python` · `scikit-learn` · `Streamlit` · `pandas` · `matplotlib`
+`Python` · `scikit-learn` · `pandas` · `Streamlit` · `matplotlib`
         """
     )
-    st.info("Pick a model in the left sidebar, then open **Try It Live** to see it in action.")
+    st.info("Use the **Model** and **Decision threshold** controls in the sidebar — every tab updates live.")
 
 
 # --------------------------------------------------------------------------- #
-# Explore the data
+# Data & insights (EDA)
 # --------------------------------------------------------------------------- #
-with tab_data:
-    st.subheader("A look at the raw images")
-    st.write(
-        "Each sample is an 8×8 grid of pixel intensities. Here is one example "
-        "of every digit from 0 to 9:"
+def churn_rate_by(col: str) -> pd.Series:
+    return data.df.groupby(col)["Churn"].mean().sort_values(ascending=False)
+
+
+with tab_eda:
+    st.subheader("Who churns, and by how much?")
+    st.caption("Share of customers in each group who left. Taller bars = higher churn risk.")
+
+    a, b = st.columns(2)
+    with a:
+        st.markdown("**Churn rate by contract type**")
+        st.bar_chart(churn_rate_by("Contract"), color=CHURN_C, height=280)
+        st.caption("Month-to-month customers churn far more than those on longer contracts.")
+    with b:
+        st.markdown("**Churn rate by internet service**")
+        st.bar_chart(churn_rate_by("InternetService"), color=CHURN_C, height=280)
+        st.caption("Fibre-optic customers churn more — often a price/expectation signal.")
+
+    st.divider()
+    c, d = st.columns(2)
+    with c:
+        st.markdown("**Tenure vs. churn**")
+        tmp = data.df.copy()
+        tmp["tenure_group"] = pd.cut(
+            tmp["tenure"], bins=[0, 6, 12, 24, 48, 72],
+            labels=["0-6m", "6-12m", "1-2y", "2-4y", "4-6y"], include_lowest=True,
+        )
+        st.bar_chart(tmp.groupby("tenure_group", observed=True)["Churn"].mean(), color=PRIMARY, height=280)
+        st.caption("New customers are the flight risk; loyalty grows with tenure.")
+    with d:
+        st.markdown("**Monthly charges: churned vs. stayed**")
+        fig, ax = plt.subplots(figsize=(5, 3.2))
+        ax.hist(data.df[data.df.Churn == 0]["MonthlyCharges"], bins=30, alpha=0.7, label="Stayed", color=STAY_C)
+        ax.hist(data.df[data.df.Churn == 1]["MonthlyCharges"], bins=30, alpha=0.7, label="Churned", color=CHURN_C)
+        ax.set_xlabel("Monthly charges ($)")
+        ax.set_ylabel("Customers")
+        ax.legend()
+        fig.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+        st.caption("Churn skews toward higher monthly bills.")
+
+    with st.expander("Peek at the raw data"):
+        st.dataframe(data.df.head(50))
+
+
+# --------------------------------------------------------------------------- #
+# Models & evaluation
+# --------------------------------------------------------------------------- #
+with tab_models:
+    st.subheader("Model comparison")
+    st.caption("5-fold cross-validated ROC-AUC on the training data (higher is better).")
+    comparison = get_comparison()
+    comp_df = pd.DataFrame(
+        {"model": [s.name for s in comparison], "cv_roc_auc": [s.cv_auc_mean for s in comparison]}
+    ).set_index("model")
+    st.bar_chart(comp_df, color=PRIMARY, height=240)
+
+    st.divider()
+    st.subheader(f"{model_name} — held-out test performance")
+    st.caption(f"Evaluated on unseen customers at a decision threshold of **{threshold:.2f}**.")
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("ROC-AUC", f"{ev.roc_auc:.3f}")
+    m2.metric("Accuracy", f"{ev.accuracy:.1%}")
+    m3.metric("Precision", f"{ev.precision:.1%}", help="Of those flagged as churners, how many actually churned.")
+    m4.metric("Recall", f"{ev.recall:.1%}", help="Of all real churners, how many we caught.")
+    m5.metric("F1", f"{ev.f1:.3f}")
+
+    left, right = st.columns(2)
+    with left:
+        st.markdown("**ROC curve**")
+        fig, ax = plt.subplots(figsize=(5, 4))
+        ax.plot(ev.fpr, ev.tpr, color=PRIMARY, lw=2, label=f"AUC = {ev.roc_auc:.3f}")
+        ax.plot([0, 1], [0, 1], "--", color="gray", lw=1, label="Random")
+        ax.set_xlabel("False positive rate")
+        ax.set_ylabel("True positive rate")
+        ax.legend(loc="lower right")
+        fig.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+    with right:
+        st.markdown("**Confusion matrix** (at current threshold)")
+        cm = ev.confusion
+        fig, ax = plt.subplots(figsize=(5, 4))
+        im = ax.imshow(cm, cmap="Blues")
+        labels = ["Stay", "Churn"]
+        ax.set_xticks([0, 1], labels)
+        ax.set_yticks([0, 1], labels)
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("Actual")
+        thresh = cm.max() / 2
+        for i in range(2):
+            for j in range(2):
+                ax.text(j, i, f"{cm[i, j]:,}", ha="center", va="center",
+                        color="white" if cm[i, j] > thresh else "black")
+        fig.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+    st.caption(
+        "Lower the threshold in the sidebar to catch more churners (recall ↑, precision ↓); "
+        "raise it to reduce false alarms."
     )
 
-    # One example image per class (0-9).
-    cols = st.columns(10)
-    for digit in range(10):
-        idx = int(np.where(data.y_test == digit)[0][0])
-        with cols[digit]:
-            st.pyplot(digit_figure(data.images_test[idx], size=1.1))
-            st.caption(f"“{digit}”")
-
-    st.divider()
-    left, right = st.columns([1, 1])
-    with left:
-        st.subheader("How many of each digit?")
-        counts = pd.Series(
-            np.concatenate([data.y_train, data.y_test])
-        ).value_counts().sort_index()
-        counts.index = [str(i) for i in counts.index]
-        st.bar_chart(counts, height=300)
-        st.caption("The dataset is well balanced across all ten digits.")
-    with right:
-        st.subheader("Dataset at a glance")
-        st.dataframe(
-            pd.DataFrame(
-                {
-                    "Property": [
-                        "Total images",
-                        "Training images",
-                        "Test images",
-                        "Pixels per image",
-                        "Pixel value range",
-                        "Classes",
-                    ],
-                    "Value": [
-                        f"{data.n_samples:,}",
-                        f"{len(data.X_train):,}",
-                        f"{len(data.X_test):,}",
-                        "64 (8×8)",
-                        "0 – 16 (grayscale)",
-                        "10 (digits 0–9)",
-                    ],
-                }
-            ),
-            hide_index=True,
-        )
-
 
 # --------------------------------------------------------------------------- #
-# Model & performance
+# Explainability
 # --------------------------------------------------------------------------- #
-with tab_perf:
-    st.subheader(f"How well does **{model_name}** do?")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Test accuracy", f"{model.accuracy:.2%}")
-    m2.metric("5-fold CV accuracy", f"{model.cv_mean:.2%}", f"± {model.cv_std:.2%}")
-    m3.metric("Test errors", f"{int(round(model.error_rate * len(data.y_test)))} / {len(data.y_test)}")
+with tab_explain:
+    st.subheader("What drives the model's churn predictions?")
+    st.caption(
+        "Permutation importance: how much test ROC-AUC drops when each feature is "
+        "randomly shuffled. Bigger drop = more important to the prediction."
+    )
+    with st.spinner("Computing feature importance…"):
+        imp = get_importances(model_name).head(12).iloc[::-1]
 
-    st.divider()
-    left, right = st.columns([1.1, 1])
-    with left:
-        st.subheader("Confusion matrix")
-        st.caption("Rows = the true digit, columns = what the model guessed. A strong diagonal is good.")
-        st.pyplot(confusion_figure(model.confusion, data.target_names))
-    with right:
-        st.subheader("Per-digit scores")
-        report_df = pd.DataFrame(model.report).transpose()
-        per_class = report_df.loc[data.target_names, ["precision", "recall", "f1-score"]]
-        per_class.index.name = "digit"
-        st.dataframe(
-            per_class.style.format("{:.2f}").background_gradient(cmap="Greens", axis=None),
-            height=400,
-        )
-        st.caption("Precision, recall, and F1-score for each digit (1.00 is perfect).")
-
-
-# --------------------------------------------------------------------------- #
-# Try it live
-# --------------------------------------------------------------------------- #
-with tab_try:
-    st.subheader("Watch the model classify a digit")
-    st.write(
-        "Pick a test image (one the model was **not** trained on) and see its "
-        "prediction, along with how confident it is."
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.barh(imp["feature"], imp["importance"], xerr=imp["std"], color=PRIMARY)
+    ax.set_xlabel("Drop in ROC-AUC when shuffled")
+    fig.tight_layout()
+    st.pyplot(fig)
+    plt.close(fig)
+    st.caption(
+        "Typically **contract type, tenure, and charges** dominate — the same "
+        "signals visible in the Data & Insights tab, now confirmed by the model."
     )
 
-    if "sample_idx" not in st.session_state:
-        st.session_state.sample_idx = 0
 
-    controls = st.columns([1, 2])
-    with controls[0]:
-        if st.button("🎲 Random digit"):
-            st.session_state.sample_idx = int(np.random.randint(len(data.y_test)))
-    with controls[1]:
-        st.session_state.sample_idx = st.slider(
-            "…or choose a test image by index",
-            0,
-            len(data.y_test) - 1,
-            st.session_state.sample_idx,
-        )
+# --------------------------------------------------------------------------- #
+# Predict
+# --------------------------------------------------------------------------- #
+with tab_predict:
+    st.subheader("Score a customer")
+    st.caption("Fill in a customer profile and get their churn probability in real time.")
 
-    idx = st.session_state.sample_idx
-    result = predict_one(model, data.X_test[idx])
-    actual = int(data.y_test[idx])
-    correct = result["label"] == actual
-
-    show_l, show_r = st.columns([1, 1.4])
-    with show_l:
-        st.pyplot(digit_figure(data.images_test[idx], size=2.6))
-    with show_r:
-        p1, p2 = st.columns(2)
-        p1.metric("Model predicts", result["label"])
-        p2.metric("Actual answer", actual)
-        if correct:
-            st.success(f"✅ Correct — the model is {result['confidence']:.1%} confident.")
-        else:
-            st.error(f"❌ Missed it (predicted {result['label']}, was {actual}).")
-
-        proba_df = pd.DataFrame(
-            {"probability": result["probabilities"]},
-            index=[str(d) for d in range(10)],
-        )
-        proba_df.index.name = "digit"
-        st.caption("How the model scored each possible digit:")
-        st.bar_chart(proba_df, height=220)
-
-    st.divider()
-    with st.expander("🔎 Where does the model make mistakes?"):
-        wrong = misclassified_indices(model, data)
-        if len(wrong) == 0:
-            st.write("This model classified every test image correctly. 🎉")
-        else:
-            st.write(
-                f"The model missed **{len(wrong)}** of {len(data.y_test)} test images. "
-                "A few examples (its guess vs. the truth):"
+    inputs: dict = {}
+    with st.form("customer"):
+        cols = st.columns(3)
+        # Numeric inputs (SeniorCitizen shown as Yes/No).
+        with cols[0]:
+            inputs["tenure"] = st.slider("Tenure (months)", 0, 72, 12)
+            inputs["MonthlyCharges"] = st.slider(
+                "Monthly charges ($)",
+                float(meta["MonthlyCharges"]["min"]),
+                float(meta["MonthlyCharges"]["max"]),
+                float(meta["MonthlyCharges"]["median"]),
             )
-            gallery = st.columns(8)
-            for slot, w in zip(gallery, wrong[:8]):
-                with slot:
-                    st.pyplot(digit_figure(data.images_test[w], size=1.0))
-                    st.caption(f"saw {int(model.y_pred[w])} · was {int(data.y_test[w])}")
+            inputs["TotalCharges"] = st.number_input(
+                "Total charges ($)", min_value=0.0,
+                value=float(meta["TotalCharges"]["median"]),
+            )
+            inputs["SeniorCitizen"] = 1 if st.selectbox("Senior citizen", ["No", "Yes"]) == "Yes" else 0
+
+        # Categorical inputs split across the remaining columns.
+        cat_cols = CATEGORICAL_FEATURES
+        half = (len(cat_cols) + 1) // 2
+        with cols[1]:
+            for c in cat_cols[:half]:
+                inputs[c] = st.selectbox(c, meta[c]["choices"])
+        with cols[2]:
+            for c in cat_cols[half:]:
+                inputs[c] = st.selectbox(c, meta[c]["choices"])
+
+        submitted = st.form_submit_button("🔮 Predict churn", type="primary")
+
+    if submitted:
+        result = predict_customer(model, inputs, threshold=threshold)
+        p = result["probability"]
+        r1, r2 = st.columns([1, 1.4])
+        with r1:
+            st.metric("Churn probability", f"{p:.1%}")
+            st.metric("Risk level", result["risk"])
+        with r2:
+            if result["will_churn"]:
+                st.error(
+                    f"⚠️ **Likely to churn** (probability {p:.1%} ≥ threshold {threshold:.2f}). "
+                    "A retention offer may be worthwhile."
+                )
+            else:
+                st.success(
+                    f"✅ **Likely to stay** (probability {p:.1%} < threshold {threshold:.2f})."
+                )
+            st.progress(min(max(p, 0.0), 1.0))
+        st.caption("Adjust the decision threshold in the sidebar to change the flagging cut-off.")
 
 
 st.markdown("---")
-st.caption(
-    "Digit Vision · built with scikit-learn + Streamlit · self-contained, no API keys required."
-)
+st.caption("Churn Radar · scikit-learn + Streamlit · self-contained, no API keys required.")

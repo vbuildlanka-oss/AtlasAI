@@ -1,8 +1,8 @@
-"""Headless smoke test: actually run the Streamlit app and assert it renders.
+"""Headless smoke test: run the Streamlit app and assert it renders.
 
-Uses Streamlit's built-in AppTest harness, which executes app.py in-process
-(training a model, rendering every tab) and surfaces any exception — a strong
-guarantee that the deployed app will boot and work.
+Uses Streamlit's AppTest harness, which executes app.py in-process (loading
+data, training a model, rendering every tab) and surfaces any exception — a
+strong guarantee the deployed app will boot and work.
 
     python tests/test_app_smoke.py     # or: pytest
 """
@@ -19,26 +19,38 @@ from streamlit.testing.v1 import AppTest
 APP = str(ROOT / "app.py")
 
 
-def test_app_boots_without_error():
-    at = AppTest.from_file(APP, default_timeout=180).run()
-    assert at.exception is None or len(at.exception) == 0, f"App raised: {at.exception}"
-    # The four tabs and the model selector should all be present.
-    assert len(at.tabs) == 4
-    assert len(at.selectbox) >= 1
+def _no_exception(at) -> bool:
+    return at.exception is None or len(at.exception) == 0
 
 
-def test_switching_model_and_predicting():
-    at = AppTest.from_file(APP, default_timeout=180).run()
-    # Switch to Random Forest and re-run — should still render cleanly.
-    at.selectbox[0].select("Random Forest").run()
-    assert at.exception is None or len(at.exception) == 0, f"After model switch: {at.exception}"
-    # Move the "choose a test image" slider and re-run the prediction path.
-    if len(at.slider) >= 1:
-        at.slider[0].set_value(100).run()
-        assert at.exception is None or len(at.exception) == 0, f"After slider: {at.exception}"
+def _by_key(elements, key):
+    """Find a widget by its key (widget order in AppTest is not guaranteed)."""
+    for el in elements:
+        if getattr(el, "key", None) == key:
+            return el
+    raise KeyError(f"No widget with key '{key}'")
+
+
+def test_app_boots():
+    at = AppTest.from_file(APP, default_timeout=300).run()
+    assert _no_exception(at), f"App raised: {at.exception}"
+    assert len(at.tabs) == 5
+    # The sidebar controls exist and are addressable by key.
+    assert _by_key(at.selectbox, "model_select") is not None
+    assert _by_key(at.slider, "threshold") is not None
+
+
+def test_threshold_and_model_switch():
+    at = AppTest.from_file(APP, default_timeout=300).run()
+    # Move the decision-threshold slider.
+    _by_key(at.slider, "threshold").set_value(0.3).run()
+    assert _no_exception(at), f"After threshold change: {at.exception}"
+    # Switch to a different model.
+    _by_key(at.selectbox, "model_select").select("Random Forest").run()
+    assert _no_exception(at), f"After model switch: {at.exception}"
 
 
 if __name__ == "__main__":
-    test_app_boots_without_error()
-    test_switching_model_and_predicting()
-    print("App boots, switches models, and predicts without errors. ✅")
+    test_app_boots()
+    test_threshold_and_model_switch()
+    print("App boots, switches model, and adjusts threshold without errors. ✅")

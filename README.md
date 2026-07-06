@@ -1,86 +1,110 @@
-# ✏️ Digit Vision — Handwritten Digit Recognition
+# 📡 Churn Radar — Customer Churn Prediction & Insights
 
-An interactive machine-learning web app that trains a model to recognise
-handwritten digits (0–9), compares several classifiers, and lets you watch it
-make predictions in real time — with a clear view of *how* it decides.
+An end-to-end machine-learning app that predicts which telecom customers are
+about to cancel, explains **why**, and scores new customers interactively — so a
+retention team can act *before* customers leave.
 
-**Fully self-contained: no API keys, no database, no internet required.** The
-dataset ships inside scikit-learn, so there is nothing external to configure and
-nothing that can fail at runtime — which makes it a reliable portfolio demo.
+**Fully self-contained: no API keys, no database, no external services.** The
+dataset is bundled and models train locally, so it always runs and is trivial to
+deploy — a reliable portfolio demo.
 
-> **Tech stack:** Python · scikit-learn · Streamlit · pandas · matplotlib
+> **Tech stack:** Python · scikit-learn · pandas · Streamlit · matplotlib
 
 ---
 
-## ✨ What it does
+## 🎯 What this project demonstrates
 
-- **🏠 Overview** — the project at a glance, with headline accuracy.
-- **📊 Explore the Data** — sample digit images, class balance, and dataset stats.
-- **🤖 Model & Performance** — pick from four classifiers (SVM, Random Forest,
-  K-Nearest Neighbors, Logistic Regression) and see test accuracy, 5-fold
-  cross-validation, a confusion matrix, and per-digit precision/recall/F1.
-- **🔮 Try It Live** — classify individual test images, view the model's
-  confidence across all ten digits, and browse the cases it gets wrong.
+This is built to show real ML-engineering practice, not just a model that fits:
 
-The best model reaches roughly **97–99%** accuracy on unseen digits.
+- **Reproducible data pipeline** — a real, slightly messy dataset (7,043
+  customers) cleaned and split deterministically.
+- **A proper scikit-learn `Pipeline`** — median imputation, scaling, and
+  one-hot encoding are bundled *with* the classifier via a `ColumnTransformer`,
+  so training and serving apply identical transforms (no train/serve skew).
+- **Model selection done right** — Logistic Regression, Random Forest, and
+  Gradient Boosting compared by **5-fold cross-validated ROC-AUC**. (A
+  well-regularised, class-balanced Logistic Regression wins here — a nice
+  reminder that simple, interpretable models are often strong baselines.)
+- **Honest metrics for imbalanced data** — only ~26% of customers churn, so the
+  app reports **ROC-AUC, precision, and recall**, not just accuracy.
+- **An adjustable decision threshold** — a live control to trade recall for
+  precision, framed as the business decision it really is.
+- **Explainability** — permutation importance shows what actually drives churn.
+- **A live predictor** — score any customer profile and get a churn probability.
+- **Tests + tooling** — a pipeline test suite, a Streamlit app smoke test, an
+  offline hyperparameter-tuning script, and a `Makefile`.
+
+---
+
+## 🖥️ The app (five tabs)
+
+1. **🏠 Overview** — the business problem and headline performance.
+2. **📊 Data & Insights** — churn broken down by contract, tenure, service, and
+   charges (the drivers you can *see*).
+3. **🤖 Models & Evaluation** — cross-validated model comparison, ROC curve,
+   confusion matrix, and precision/recall at your chosen threshold.
+4. **🔍 What Drives Churn** — permutation-importance ranking of the features.
+5. **🔮 Predict a Customer** — an interactive form that returns a churn
+   probability and risk level in real time.
 
 ---
 
 ## 🚀 Run it locally
 
-You need **Python 3.9+**.
+Requires **Python 3.9+**.
 
 ```bash
-# 1. (optional) create a virtual environment
-python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
-
-# 2. install dependencies
 pip install -r requirements.txt
-
-# 3. launch the app
 streamlit run app.py
 ```
 
 Then open the URL it prints (usually http://localhost:8501).
 
-### Run the tests
+Handy shortcuts via the `Makefile`:
 
 ```bash
-python tests/test_pipeline.py      # or: pytest
+make install   # install dependencies
+make app       # run the app
+make test      # run the test suite
+make train     # compare models + tune the best (offline)
+```
+
+### Tests
+
+```bash
+python tests/test_pipeline.py     # ML pipeline checks
+python tests/test_app_smoke.py    # headless app boot test
+# or simply:  pytest
 ```
 
 ---
 
 ## ☁️ Deploy it for free (Streamlit Community Cloud)
 
-No credit card, no server setup.
+No credit card, no servers.
 
-1. Push this repo to **GitHub** (already done if you're reading this there).
+1. Push this repo to **GitHub**.
 2. Go to **https://share.streamlit.io** and sign in with GitHub.
 3. Click **Create app** → **Deploy a public app from GitHub**.
-4. Select this **repository**, branch **`main`**, and main file **`app.py`**.
-5. Click **Deploy**. In a couple of minutes you'll get a public link to share.
+4. Choose this **repository**, branch **`main`**, main file **`app.py`**.
+5. Click **Deploy** — a couple of minutes later you get a public link to share.
 
-Streamlit reads `requirements.txt` automatically — there is nothing else to set.
+`requirements.txt` is detected automatically; there is nothing else to configure.
 
 ---
 
-## 🧠 How it works
+## 📊 Results
 
-```
-digits dataset (8×8 images)  ->  train/test split  ->  classifier
-                                                          |
-                       accuracy · confusion matrix · per-digit scores
-                                                          |
-                                    live prediction + confidence
-```
+Held-out test performance (Logistic Regression, threshold 0.5):
 
-1. **Data** — 1,797 labelled 8×8 grayscale digit images from scikit-learn.
-2. **Train** — a classifier learns the pixel patterns of each digit (a fixed
-   random seed keeps results reproducible).
-3. **Evaluate** — accuracy and a confusion matrix are computed on held-out data
-   the model never saw during training.
-4. **Predict** — any test image is classified with a full probability breakdown.
+| Metric | Score |
+| ------ | ----- |
+| ROC-AUC | ~0.84 |
+| Recall (churners caught) | ~0.78 |
+| Precision | ~0.50 |
+
+Lowering the decision threshold catches more churners (higher recall) at the
+cost of more false alarms — the app lets you explore this trade-off live.
 
 ---
 
@@ -88,22 +112,28 @@ digits dataset (8×8 images)  ->  train/test split  ->  classifier
 
 ```
 .
-├── app.py                  # Streamlit UI (the whole web app)
+├── app.py                  # Streamlit app (the five-tab UI)
+├── train.py                # offline model comparison + hyperparameter tuning
+├── data/
+│   └── telco_churn.csv      # bundled dataset (no runtime download)
 ├── src/
-│   ├── data.py             # dataset loading + reproducible train/test split
-│   └── model.py            # model definitions, training, evaluation, prediction
+│   ├── data.py             # loading, cleaning, reproducible split, feature metadata
+│   ├── pipeline.py         # preprocessing ColumnTransformer + model definitions
+│   └── evaluate.py         # model comparison, evaluation, explainability, prediction
 ├── tests/
-│   └── test_pipeline.py    # end-to-end checks (data, training, prediction)
+│   ├── test_pipeline.py    # end-to-end ML checks
+│   └── test_app_smoke.py   # headless Streamlit boot test
 ├── requirements.txt
-├── .streamlit/config.toml  # app theme
+├── Makefile
+├── .streamlit/config.toml
 └── README.md
 ```
 
 ---
 
-## 📊 About the dataset
+## 📚 Dataset
 
-The [scikit-learn digits dataset](https://scikit-learn.org/stable/datasets/toy_dataset.html#optical-recognition-of-handwritten-digits-dataset)
-is a classic optical-character-recognition benchmark: 1,797 images of
-handwritten digits, each an 8×8 grid of pixel intensities (0–16), labelled 0–9.
-It is bundled with scikit-learn, so the app needs no downloads.
+The [Telco Customer Churn](https://www.kaggle.com/datasets/blastchar/telco-customer-churn)
+dataset (IBM sample data): 7,043 customers with account, demographic, and service
+attributes, labelled by whether they churned. It is bundled in `data/` for
+offline, reproducible runs.

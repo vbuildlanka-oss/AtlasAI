@@ -1,7 +1,7 @@
-# Digit Vision — runtime dependencies (all free, no API keys).
-# Pinned to widely-available, compatible versions for reproducible deploys.
+# Churn Radar — runtime dependencies (all free, no API keys).
 streamlit>=1.36,<2
 scikit-learn>=1.4,<2
-numpy>=1.26,<3
 pandas>=2.0,<3
+numpy>=1.26,<3
 matplotlib>=3.7,<4
+scipy>=1.10,<2

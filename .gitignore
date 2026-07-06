@@ -10,10 +10,13 @@ __pycache__/
 venv/
 env/
 
+# Saved model artifacts (the app trains at runtime; pickles are version-specific)
+models/
+
 # OS / editor
 .DS_Store
 .idea/
 .vscode/
 
-# Streamlit local secrets (not used by this project, but ignored just in case)
+# Streamlit local secrets (not used by this project)
 .streamlit/secrets.toml

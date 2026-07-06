@@ -1,1 +1,1 @@
-"""Digit Vision — self-contained ML core (data + models)."""
+"""Customer churn prediction — self-contained ML core (data, pipeline, evaluation)."""
