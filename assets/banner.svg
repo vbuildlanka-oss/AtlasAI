@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320" role="img" aria-label="Churn Radar — see churn coming">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="320" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0b1016"/>
+      <stop offset="55%" stop-color="#0a0e14"/>
+      <stop offset="100%" stop-color="#0e1a17"/>
+    </linearGradient>
+    <linearGradient id="sweep2" x1="180" y1="160" x2="180" y2="42" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2ee6a6" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#2ee6a6" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#bfe9db"/>
+    </linearGradient>
+    <filter id="g2" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="320" fill="url(#bg)"/>
+
+  <!-- radar emblem -->
+  <g transform="translate(180,160)">
+    <circle r="118" fill="#0a0e14" stroke="#2ee6a6" stroke-opacity="0.85" stroke-width="3"/>
+    <g fill="none" stroke="#2ee6a6" stroke-opacity="0.25" stroke-width="1.5">
+      <circle r="34"/><circle r="68"/><circle r="102"/>
+    </g>
+    <g stroke="#2ee6a6" stroke-opacity="0.18" stroke-width="1.5">
+      <line x1="0" y1="-118" x2="0" y2="118"/>
+      <line x1="-118" y1="0" x2="118" y2="0"/>
+    </g>
+    <path d="M0 0 L0 -118 A118 118 0 0 1 102 -59 Z" fill="url(#sweep2)"/>
+    <line x1="0" y1="0" x2="102" y2="-59" stroke="#2ee6a6" stroke-width="2.5" stroke-opacity="0.9"/>
+    <circle cx="66" cy="-38" r="7.5" fill="#ff5c72" filter="url(#g2)"/>
+    <circle cx="-52" cy="40" r="3.5" fill="#2ee6a6" fill-opacity="0.7"/>
+    <circle r="5" fill="#2ee6a6" filter="url(#g2)"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="360" y="150" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="76" font-weight="800" fill="url(#word)" letter-spacing="1">CHURN RADAR</text>
+  <text x="362" y="196" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="30" font-weight="500" fill="#2ee6a6" letter-spacing="0.5">See churn coming.</text>
+  <text x="362" y="236" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="19" fill="#8b93a7">Machine-learning early-warning for customer retention.</text>
+
+  <!-- tech chips -->
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#cfd6e4">
+    <rect x="362" y="258" width="98" height="30" rx="15" fill="#141b24" stroke="#2b3442"/>
+    <text x="411" y="278" text-anchor="middle">Python</text>
+    <rect x="470" y="258" width="132" height="30" rx="15" fill="#141b24" stroke="#2b3442"/>
+    <text x="536" y="278" text-anchor="middle">scikit-learn</text>
+    <rect x="612" y="258" width="104" height="30" rx="15" fill="#141b24" stroke="#2b3442"/>
+    <text x="664" y="278" text-anchor="middle">Streamlit</text>
+  </g>
+</svg>

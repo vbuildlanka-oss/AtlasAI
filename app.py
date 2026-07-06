@@ -25,15 +25,16 @@ from src.evaluate import (
 from src.pipeline import DEFAULT_MODEL, MODELS
 
 st.set_page_config(
-    page_title="Churn Radar — ML Studio",
+    page_title="Churn Radar — See churn coming",
     page_icon="📡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-PRIMARY = "#5b8cff"
-CHURN_C = "#ff6b6b"
-STAY_C = "#3fce8f"
+# Brand palette (radar): green = signal/safe, red = detected churn, blue = neutral
+PRIMARY = "#2ee6a6"   # radar green
+CHURN_C = "#ff5c72"   # churn / high-risk
+STAY_C = "#4da3ff"    # neutral / stayed
 
 
 # --------------------------------------------------------------------------- #
@@ -68,7 +69,7 @@ meta = feature_metadata(data.X)
 # --------------------------------------------------------------------------- #
 with st.sidebar:
     st.title("📡 Churn Radar")
-    st.caption("Predict and explain customer churn.")
+    st.caption("See churn coming.")
     model_name = st.selectbox(
         "Model",
         list(MODELS.keys()),
@@ -101,7 +102,10 @@ ev = evaluate_model(model, data, threshold=threshold)
 # Header
 # --------------------------------------------------------------------------- #
 st.title("📡 Churn Radar")
-st.markdown("#### Predicting which customers will leave — and showing why.")
+st.markdown(
+    "##### **See churn coming** — an ML early-warning system that spots at-risk "
+    "customers *before* they leave, and shows you why."
+)
 
 tab_home, tab_eda, tab_models, tab_explain, tab_predict = st.tabs(
     ["🏠 Overview", "📊 Data & Insights", "🤖 Models & Evaluation", "🔍 What Drives Churn", "🔮 Predict a Customer"]

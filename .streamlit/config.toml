@@ -1,7 +1,8 @@
+# Churn Radar — brand theme (radar / phosphor-green on deep dark)
 [theme]
-primaryColor = "#5b8cff"
-backgroundColor = "#0f1115"
-secondaryBackgroundColor = "#1c2029"
+primaryColor = "#2ee6a6"
+backgroundColor = "#0a0e14"
+secondaryBackgroundColor = "#121822"
 textColor = "#e6e9ef"
 font = "sans serif"
 
