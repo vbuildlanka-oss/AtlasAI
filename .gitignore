@@ -1,32 +1,13 @@
-# Dependencies
+# Node
 node_modules/
-**/node_modules/
+web/dist/
+*.local
 
-# Build output
-dist/
-build/
-**/dist/
-**/build/
+# transformers.js / onnxruntime model cache
+.cache/
+scripts/.cache/
+web/.cache/
 
-# Env / secrets
-.env
-**/.env
-!**/.env.example
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Editor / OS
+# OS / editor
 .DS_Store
-.idea/
-.vscode/
-*.swp
-
-# Postgres volume (if bind-mounted locally)
-pgdata/
-
-# Uploads
-backend/uploads/
+Thumbs.db

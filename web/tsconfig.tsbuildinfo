@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/Galaxy.tsx","./src/components/PhotoGrid.tsx","./src/components/PhotoModal.tsx","./src/components/QualityPanel.tsx","./src/components/SearchBar.tsx","./src/components/UploadZone.tsx","./src/lib/clip.ts","./src/lib/pca.ts","./src/lib/search.ts","./src/lib/vocab.ts"],"version":"5.9.3"}
