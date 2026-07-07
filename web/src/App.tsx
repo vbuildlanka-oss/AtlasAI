@@ -284,6 +284,7 @@ export default function App() {
 
       <footer className="footer">
         <p>Demo images sourced via Openverse. Per-image credits appear on each photo.</p>
+        <p className="brandmark">© {new Date().getFullYear()} vbuild™</p>
       </footer>
     </div>
   );
