@@ -1,19 +1,14 @@
 # 🔮 Iris — Neural Photo Search
 
-**Search your photos by describing them.** Type *"a dog playing outside"* or
-*"city lights at night"* and Iris finds the matching images — powered by
-OpenAI's **CLIP** vision-language model running **100% in your browser**.
+Search photos by describing them. Type *"a dog playing outside"* or *"city
+lights at night"* and Iris returns the matching images, ranked by relevance.
+It uses OpenAI's **CLIP** vision-language model, executed in the browser with
+Hugging Face Transformers.js and ONNX Runtime Web.
 
-No server. No API keys. No uploads. The neural network downloads once and
-every embedding, search, and tag is computed on your device. Built entirely
-with **free, open-source** tools (Hugging Face Transformers.js, ONNX Runtime
-Web, React, Vite) and **Creative-Commons** demo imagery.
-
-> **The interesting bit:** this isn't an app that calls a hosted API — it *is*
-> the model. A 512-dimension multimodal embedding space is computed
-> client-side, image and text land in the *same* space, and search is just
-> cosine similarity. The result is private, offline-capable, and free to host
-> as a static site.
+Because inference is client-side, the app is a static site with no backend:
+the model is downloaded once and cached, and images and queries are processed
+locally. Image and text are embedded into a shared 512-dimension space, so
+search reduces to cosine similarity in that space.
 
 ---
 

@@ -39,13 +39,10 @@ export default function UploadZone({ onFiles, busy }: Props) {
         onChange={(e) => handle(e.target.files)}
       />
       {busy ? (
-        <>⏳ Embedding your images with CLIP…</>
+        <>Embedding images…</>
       ) : (
         <>
-          <strong style={{ color: "var(--text)" }}>Drop your own photos</strong> or click to
-          browse.
-          <br />
-          They're embedded locally and never leave your device.
+          <strong style={{ color: "var(--text)" }}>Drop photos</strong> or click to browse.
         </>
       )}
     </div>

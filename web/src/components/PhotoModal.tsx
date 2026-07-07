@@ -60,7 +60,7 @@ export default function PhotoModal({ photo, tags, tagsLoading, onClose, onFindSi
         )}
         {photo.isUpload && (
           <div className="attrib" style={{ marginTop: 16 }}>
-            Your uploaded image — embedded locally, never sent anywhere.
+            Uploaded image
           </div>
         )}
       </div>

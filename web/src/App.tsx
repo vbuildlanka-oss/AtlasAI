@@ -191,13 +191,8 @@ export default function App() {
           <div className="logo">🔮</div>
           <div>
             <h1>Iris</h1>
-            <p>Neural photo search · runs in your browser</p>
+            <p>Neural photo search</p>
           </div>
-        </div>
-        <div className="badges">
-          <span className="chip live">100% on-device</span>
-          <span className="chip">CLIP ViT-B/32 · Transformers.js</span>
-          <span className="chip">No server · No API keys</span>
         </div>
       </header>
 
@@ -206,9 +201,8 @@ export default function App() {
           Find any photo by <span className="g">describing it</span>.
         </h2>
         <p>
-          A real CLIP neural network downloads once and runs entirely on your device —
-          search {photos.filter((p) => !p.isUpload).length} demo photos or drop in your own.
-          Nothing is ever uploaded.
+          Search {photos.filter((p) => !p.isUpload).length} demo photos with natural language,
+          or add your own.
         </p>
       </section>
 
@@ -256,7 +250,7 @@ export default function App() {
         <div style={{ display: "flex", flexDirection: "column", gap: 18, position: "sticky", top: 16 }}>
           <div className="card">
             <h3>Add your own photos</h3>
-            <p className="sub">Embedded locally with the CLIP vision tower.</p>
+            <p className="sub">Add images to include them in the search.</p>
             <UploadZone onFiles={onFiles} busy={uploadBusy} />
           </div>
 
@@ -289,15 +283,7 @@ export default function App() {
       )}
 
       <footer className="footer">
-        <p>
-          Powered by <b>OpenAI CLIP</b> (ViT-B/32) via <b>Transformers.js</b> + ONNX Runtime Web.
-          The model runs client-side; images and queries never leave your browser.
-        </p>
-        <p>
-          Demo images are Creative-Commons / public-domain, sourced with attribution via{" "}
-          <a href="https://openverse.org" target="_blank" rel="noreferrer">Openverse</a>.
-          Retrieval quality is measured offline in <code>/scripts</code>.
-        </p>
+        <p>Demo images sourced via Openverse. Per-image credits appear on each photo.</p>
       </footer>
     </div>
   );
