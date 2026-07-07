@@ -1,0 +1,16 @@
+{
+  "name": "iris-ml-tooling",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Offline ML tooling for Iris: builds the demo gallery, computes CLIP embeddings, and evaluates retrieval quality.",
+  "scripts": {
+    "gallery": "node build-gallery.mjs",
+    "embed": "node embed-gallery.mjs",
+    "evaluate": "node evaluate.mjs",
+    "all": "node build-gallery.mjs && node embed-gallery.mjs && node evaluate.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.0.0"
+  }
+}
