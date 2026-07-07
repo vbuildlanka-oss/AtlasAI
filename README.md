@@ -1,200 +1,159 @@
-# 🛰 Atlas Intelligence
+# 🧭 ChurnLens AI — Explainable Customer‑Retention Intelligence
 
-**Turn scattered market signals into precise, cited insight.**
+An end‑to‑end machine‑learning project that predicts telecom customer churn,
+**explains every prediction**, and recommends the retention action most likely
+to save each account — all in a polished dashboard that runs the model
+**100 % client‑side in the browser**.
 
-Atlas is a multi-agent AI research workspace. Analysts ask a question and get a
-synthesized, **citation-grounded** answer assembled on a flexible canvas — every
-claim traces back to the exact source chunk it came from. The goal is to compress
-research cycles from days to minutes without losing provenance.
+Built entirely with **free, open tools** (scikit‑learn, ONNX, React, Vite).
+No paid APIs, no inference server, no data ever leaves the device.
 
----
-
-## How it works
-
-```
-                    ┌─────────────┐
-   question ───────▶│  Planner    │  decomposes into focused sub-queries
-                    └──────┬──────┘
-                           ▼
-                    ┌─────────────┐
-                    │ Retrievers  │  semantic top-k over pgvector (one per sub-query)
-                    └──────┬──────┘
-                           ▼
-                    ┌─────────────┐
-                    │ Synthesizer │  composes an answer, inline-citing every claim
-                    └──────┬──────┘
-                           ▼
-              cited answer + provenance saved to Postgres
-```
-
-- **Multi-agent pipeline** — a planner splits the question, retriever agents pull
-  relevant chunks (RAG over pgvector), and a synthesizer composes the answer.
-- **Citation-grounded answers** — every claim carries an inline `[n]` marker.
-  Hover to reveal the source snippet; the synthesizer must ground or omit — no
-  uncited claims.
-- **Flexible research canvas** — draggable answer / note / source blocks you can
-  arrange freely, then export to a Markdown brief.
-- **Source ingestion + RAG** — upload text, PDFs, or URLs; Atlas chunks, embeds,
-  and stores them in pgvector for semantic retrieval.
-- **Provenance / audit trail** — the plan, retrieved evidence, and every citation
-  are persisted so you can see which sources fed which conclusions.
-
-## Tech stack
-
-| Layer         | Choice                                          |
-| ------------- | ----------------------------------------------- |
-| Frontend      | React + TypeScript + Vite                       |
-| Backend       | Node.js + TypeScript (Express)                  |
-| LLM           | OpenAI (GPT-4-class) for reasoning + synthesis  |
-| Embeddings    | OpenAI `text-embedding-3-small`                 |
-| Vector search | `pgvector` on Postgres                          |
-| Database      | Postgres (documents, chunks, sessions, answers, citations) |
-
-### Offline mock mode 🔌
-
-If you don't set `OPENAI_API_KEY`, Atlas runs the **entire pipeline offline**:
-
-- a deterministic, network-free hashing embedder (bag-of-words → vector), and
-- a template synthesizer that still produces grounded, fully-cited answers.
-
-This lets you run and demo the whole product end-to-end with **only Postgres** —
-no API key required. Add a key later to switch to real GPT-4-class reasoning.
+> **Why this design is interesting:** the model is trained and rigorously
+> evaluated in Python, then compiled into a tiny (~31 KB) JSON spec that the
+> frontend executes in pure TypeScript with **bit‑for‑bit parity** to
+> scikit‑learn (verified to `<5e‑5`). You get real ML engineering *and* a
+> zero‑cost, infinitely‑scalable static deployment.
 
 ---
 
-## Repository layout
+## ✨ What it does
+
+| Capability | Description |
+|---|---|
+| **Live risk scoring** | Adjust any customer attribute and get an instant churn probability — inference runs locally in ~0 ms. |
+| **Faithful explanations** | An additive **linear‑SHAP** waterfall shows exactly how each feature pushes the score up or down (in log‑odds). |
+| **Retention simulator** | Applies real business "levers" (contract upgrade, add‑ons, auto‑pay…), re‑runs the model, and ranks them by predicted risk reduction. |
+| **Model transparency** | 5‑fold cross‑validation leaderboard, global feature importance, and a note on the ONNX artifact. |
+| **Performance analytics** | ROC, precision‑recall, calibration curves and a confusion matrix from a held‑out test set. |
+| **Segment insights** | Ground‑truth churn rates by contract, internet type, tenure and payment method. |
+
+---
+
+## 📊 Results (real IBM Telco dataset, 7,043 customers)
+
+Three model families were benchmarked with 5‑fold cross‑validation:
+
+| Model | CV ROC‑AUC | ± std |
+|---|---|---|
+| Random Forest | 0.846 | 0.009 |
+| **Logistic Regression** ⬅ *shipped* | **0.845** | 0.012 |
+| Hist Gradient Boosting | 0.843 | 0.011 |
+
+The gradient‑boosted and bagged ensembles were statistically indistinguishable
+from logistic regression on this problem, so the **interpretable linear model
+was shipped**: it gives exact per‑feature attributions, compiles to a tiny
+universally‑portable ONNX graph, and runs trivially in the browser.
+
+**Held‑out (20 %) test metrics** at the F1‑optimal threshold:
+`ROC‑AUC 0.839 · Recall 75 % · Precision 53 % · Brier 0.14`.
+
+*(If the machine is offline, the pipeline deterministically generates a
+realistic synthetic dataset with the same schema, so it always runs.)*
+
+---
+
+## 🏗️ Architecture
 
 ```
-AtlasAI/
-├── db/schema.sql          # Postgres + pgvector schema
-├── docker-compose.yml     # Postgres (pgvector) for local dev
-├── backend/               # Node.js + TypeScript API
-│   ├── src/
-│   │   ├── agents/        # planner, retriever, synthesizer, pipeline
-│   │   ├── ingestion/     # extractors, chunker, ingest, retrieve
-│   │   ├── llm/           # OpenAI client + embeddings (+ offline mock)
-│   │   ├── routes/        # documents, sessions, research (REST + SSE)
-│   │   └── db/            # pool + migrations
-│   └── scripts/verify.ts  # core-logic verification (no DB/API needed)
-└── frontend/              # React + TypeScript + Vite
-    └── src/
-        ├── components/    # Canvas, Block, CitedAnswer, CitationInspector, …
-        ├── api/           # typed API client + SSE research stream
-        └── utils/         # Markdown export
+                  TRAIN (offline, Python)                 SERVE (browser, TS)
+ ┌───────────────────────────────────────────┐     ┌──────────────────────────┐
+ │  IBM Telco CSV ─► clean ─► feature eng.     │     │  fetch model.json        │
+ │        │                                    │     │        │                 │
+ │        ▼                                    │     │        ▼                 │
+ │  ColumnTransformer (scale + one‑hot)        │     │  exact logistic scoring  │
+ │        │                                    │     │  + linear‑SHAP           │
+ │        ▼                                    │     │        │                 │
+ │  5‑fold CV: LogReg / RF / HistGB            │     │        ▼                 │
+ │        │  (select interpretable model)      │     │  gauge · waterfall ·     │
+ │        ▼                                    │     │  what‑if simulator ·     │
+ │  evaluate ─► export ──────────────────────► │ ─►  │  performance charts      │
+ │      model.json  (spec + metrics + cohorts) │     │                          │
+ │      model.onnx  (portable, parity‑checked) │     │  0 servers · 0 API keys  │
+ └───────────────────────────────────────────┘     └──────────────────────────┘
+```
+
+The Python export encodes the fitted pipeline as additive terms
+(`coef`, baseline `mean`, plus scaler `center`/`scale`). The browser rebuilds
+the identical feature vector and computes `sigmoid(intercept + Σ coefᵢ·xᵢ)` —
+the same math scikit‑learn runs — and derives explanations as
+`coefᵢ·(xᵢ − E[xᵢ])`, which is exact SHAP for a linear model.
+
+---
+
+## 📁 Project structure
+
+```
+.
+├── ml/                         # Python ML engineering
+│   ├── churnlens/
+│   │   ├── schema.py           # single source of truth for features
+│   │   ├── data.py             # download real data (+ synthetic fallback)
+│   │   ├── modeling.py         # pipeline, CV, model selection
+│   │   ├── evaluate.py         # metrics + ROC/PR/calibration curves
+│   │   └── export.py           # JSON spec + ONNX export & parity check
+│   ├── tests/test_pipeline.py  # incl. TS/sklearn parity contract test
+│   └── run.py                  # orchestrates the whole pipeline
+└── web/                        # React + TS + Vite dashboard
+    ├── src/lib/inference.ts    # exact in‑browser model + linear‑SHAP
+    ├── src/lib/recommend.ts    # retention‑lever simulator
+    ├── src/components/         # gauge, waterfall, charts, scorer…
+    └── public/model/           # generated model.json + model.onnx
 ```
 
 ---
 
-## Getting started
+## 🚀 Run it locally
 
-### Prerequisites
-
-- Node.js 20+ (tested on 22)
-- Docker (for Postgres + pgvector), or any Postgres 16 with the `vector` extension
-
-### 1. Start Postgres (pgvector)
+**1. Train the model (regenerates the browser artifacts):**
 
 ```bash
-docker compose up -d          # brings up Postgres with pgvector on :5432
-# or, without the compose plugin:
-docker run -d --name atlas-postgres \
-  -e POSTGRES_USER=atlas -e POSTGRES_PASSWORD=atlas -e POSTGRES_DB=atlas \
-  -p 5432:5432 pgvector/pgvector:pg16
+cd ml
+python -m venv .venv && source .venv/bin/activate   # or: uv venv .venv
+pip install -r requirements.txt
+python run.py            # add --synthetic to force offline mode
+pytest                   # runs the parity + signal tests
 ```
 
-### 2. Backend
+**2. Launch the dashboard:**
 
 ```bash
-cd backend
-cp .env.example .env          # leave OPENAI_API_KEY empty for offline mock mode
+cd web
 npm install
-npm run migrate               # applies db/schema.sql
-npm run dev                   # API on http://localhost:4000
+npm run dev              # http://localhost:5173
 ```
 
-### 3. Frontend
+---
 
-```bash
-cd frontend
-npm install
-npm run dev                   # app on http://localhost:5173 (proxies /api → :4000)
-```
+## 🌐 Deploy for free (static site)
 
-Open **http://localhost:5173**, ingest a few sources (paste text, add a URL, or
-upload a PDF) in the left panel, then ask a question. Watch the agents work,
-hover the `[n]` citations to inspect sources, drag blocks around the canvas, and
-click **Export** for a Markdown brief.
+`npm run build` produces a fully static `web/dist/` (including the model
+artifacts). Host it anywhere free:
+
+- **GitHub Pages** — push `web/dist` or use the included CI workflow.
+- **Netlify / Vercel / Cloudflare Pages** — set base directory `web`,
+  build `npm run build`, publish `dist`.
+
+Because inference is client‑side, hosting cost is **$0** and it scales to any
+number of users with zero backend.
 
 ---
 
-## Deploy online for free
+## 🔬 Engineering notes
 
-Atlas deploys as a **single free web service** (the API serves the built React
-app) backed by a free Postgres database — no AI key required to start.
-
-- **Database:** a free [Neon](https://neon.tech) Postgres (pgvector supported out of the box)
-- **App:** a free [Render](https://render.com) web service — the included
-  [`render.yaml`](./render.yaml) Blueprint wires up build, start, health checks, and env vars
-
-Step-by-step, assume-nothing instructions are in **[DEPLOY.md](./DEPLOY.md)**.
-
-In production the server automatically enables TLS for hosted databases, runs
-migrations on boot (`AUTO_MIGRATE`), and serves the frontend (`SERVE_FRONTEND`).
+- **No train/serve skew:** feature definitions live in one place
+  (`schema.py`); a unit test asserts the exported spec reproduces
+  scikit‑learn's probabilities to `<1e‑9`.
+- **Calibrated & honest:** metrics come from an untouched 20 % holdout; the
+  shipped artifact is then refit on 100 % of the data.
+- **Portable:** the same pipeline is exported to ONNX (opset 15) and
+  validated against scikit‑learn for edge/server deployment.
+- **Reproducible:** deterministic seeds; offline synthetic fallback so CI
+  never depends on the network.
 
 ---
 
-## Configuration (`backend/.env`)
+## ⚠️ Disclaimer
 
-| Variable                 | Default                                       | Notes                                  |
-| ------------------------ | --------------------------------------------- | -------------------------------------- |
-| `PORT`                   | `4000`                                        | API port                               |
-| `CORS_ORIGIN`            | `http://localhost:5173`                       | comma-separated allowed origins        |
-| `DATABASE_URL`           | `postgres://atlas:atlas@localhost:5432/atlas` | Postgres connection string             |
-| `OPENAI_API_KEY`         | *(empty)*                                     | empty → offline mock mode              |
-| `OPENAI_CHAT_MODEL`      | `gpt-4o`                                       | synthesis / planning model             |
-| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small`                      | embedding model                        |
-| `EMBEDDING_DIM`          | `1536`                                        | **must** match `vector(N)` in schema   |
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | `900` / `150`                           | chunking (characters)                  |
-| `RETRIEVE_TOP_K`         | `6`                                           | chunks retrieved per sub-query         |
-
-> Changing `EMBEDDING_DIM` requires updating the `vector(1536)` columns in
-> `db/schema.sql` and re-running the migration.
-
----
-
-## API
-
-| Method | Path                             | Description                                   |
-| ------ | -------------------------------- | --------------------------------------------- |
-| GET    | `/api/health`                    | status + current mode (offline-mock / openai) |
-| GET    | `/api/documents`                 | list ingested documents (+ chunk counts)      |
-| POST   | `/api/documents/text`            | ingest raw text `{ text, title? }`            |
-| POST   | `/api/documents/url`             | ingest a URL `{ url }`                         |
-| POST   | `/api/documents/upload`          | ingest a PDF (multipart `file`)               |
-| DELETE | `/api/documents/:id`             | delete a document + its chunks                |
-| POST   | `/api/research`                  | run research `{ question }` → cited result    |
-| GET    | `/api/research/stream?question=` | same, streamed via Server-Sent Events         |
-| GET    | `/api/sessions`                  | list past research sessions                   |
-| GET    | `/api/sessions/:id`              | full session: answer, plan, citations         |
-
----
-
-## Verifying the core logic
-
-The citation-grounding and retrieval logic can be checked without a database or
-API key:
-
-```bash
-cd backend && npx tsx scripts/verify.ts
-```
-
-This exercises chunking, semantic ranking, planning, synthesis, and the
-"no-uncited-claims" guardrail, asserting that every inline `[n]` marker resolves
-to a real source chunk.
-
-## Data model
-
-`documents` → `chunks` (with `vector(1536)` embeddings) power RAG.
-A `sessions` row records each question; its `answers` row stores the synthesized
-content and planner sub-queries; `citations` link answer spans back to the exact
-`chunk` they were drawn from — the provenance trail.
+This is an educational demonstration of ML engineering on a public dataset.
+Predictions are statistical estimates on historical telecom data and are **not**
+business, financial, or professional advice.
